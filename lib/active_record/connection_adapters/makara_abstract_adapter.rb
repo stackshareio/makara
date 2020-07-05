@@ -109,19 +109,19 @@ module ActiveRecord
       hijack_method :execute, :exec_query, :exec_no_cache, :exec_cache, :transaction
       send_to_all :connect, :reconnect!, :verify!, :clear_cache!, :reset!
 
-      SQL_MASTER_MATCHERS           = [/\A\s*select.+for update\Z/i, /select.+lock in share mode\Z/i, /\A\s*select.+(nextval|currval|lastval|setval|get_lock|release_lock|pg_advisory_lock|pg_advisory_unlock)\(/i].map(&:freeze).freeze
-      SQL_SLAVE_MATCHERS            = [/\A\s*(select|with.+\)\s*select)\s/i].map(&:freeze).freeze
+      SQL_PRIMARY_MATCHERS          = [/\A\s*select.+for update\Z/i, /select.+lock in share mode\Z/i, /\A\s*select.+(nextval|currval|lastval|setval|get_lock|release_lock|pg_advisory_lock|pg_advisory_unlock)\(/i].map(&:freeze).freeze
+      SQL_REPLICA_MATCHERS          = [/\A\s*(select|with.+\)\s*select)\s/i].map(&:freeze).freeze
       SQL_ALL_MATCHERS              = [/\A\s*set\s/i].map(&:freeze).freeze
       SQL_SKIP_STICKINESS_MATCHERS  = [/\A\s*show\s([\w]+\s)?(field|table|database|schema|view|index)(es|s)?/i, /\A\s*(set|describe|explain|pragma)\s/i].map(&:freeze).freeze
 
 
-      def sql_master_matchers
-        SQL_MASTER_MATCHERS
+      def sql_primary_matchers
+        SQL_PRIMARY_MATCHERS
       end
 
 
-      def sql_slave_matchers
-        SQL_SLAVE_MATCHERS
+      def sql_replica_matchers
+        SQL_REPLICA_MATCHERS
       end
 
 
@@ -149,9 +149,9 @@ module ActiveRecord
 
           handling_an_all_execution(method_name) do
             hijacked do
-              # slave pool must run first.
-              @slave_pool.send_to_all(nil, &block)  # just yields to each con
-              @master_pool.send_to_all(nil, &block) # just yields to each con
+              # replica pool must run first.
+              @replica_pool.send_to_all(nil, &block)  # just yields to each con
+              @primary_pool.send_to_all(nil, &block) # just yields to each con
             end
           end
 
@@ -179,10 +179,10 @@ module ActiveRecord
       end
 
 
-      def needs_master?(method_name, args)
+      def needs_primary?(method_name, args)
         sql = coerce_query_to_sql_string(args.first)
-        return true if sql_master_matchers.any?{|m| sql =~ m }
-        return false if sql_slave_matchers.any?{|m| sql =~ m }
+        return true if sql_primary_matchers.any?{|m| sql =~ m }
+        return false if sql_replica_matchers.any?{|m| sql =~ m }
         true
       end
 

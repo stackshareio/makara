@@ -11,11 +11,11 @@ test:
 
   makara:
     blacklist_duration: 2
-    master_ttl: 5
+    primary_ttl: 5
     connections:
-      - role: master
-      - role: slave
-      - role: slave
+      - role: primary
+      - role: replica
+      - role: replica
     connection_error_matchers:
       - !ruby/regexp '/^ActiveRecord::StatementInvalid: Mysql2::Error: Unknown command1:/'
       - "/^ActiveRecord::StatementInvalid: Mysql2::Error: Unknown command2:/i"

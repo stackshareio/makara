@@ -5,7 +5,7 @@ describe ActiveRecord::ConnectionAdapters::MakaraAbstractAdapter::ErrorHandler d
 
   let(:handler){ described_class.new }
   let(:proxy) { FakeAdapter.new(config(1,1)) }
-  let(:connection){ proxy.master_pool.connections.first }
+  let(:connection){ proxy.primary_pool.connections.first }
 
   [
     %|Mysql::Error: : INSERT INTO `watchers` (`user_id`, `watchable_id`, `watchable_type`) VALUES|,
@@ -40,7 +40,7 @@ describe ActiveRecord::ConnectionAdapters::MakaraAbstractAdapter::ErrorHandler d
     %|PG::UnableToSend: no connection to the server|,
     %|PG::ConnectionBad (could not connect to server: Connection refused|,
     %|PG::ConnectionBad: PQsocket() can't get socket descriptor:|,
-    %|org.postgresql.util.PSQLException: Connection to localhost:123 refused. Check that the hostname and port are correct and that the postmaster is accepting TCP/IP connections.|,
+    %|org.postgresql.util.PSQLException: Connection to localhost:123 refused. Check that the hostname and port are correct and that the postprimary is accepting TCP/IP connections.|,
     %|PG::ConnectionBad: timeout expired|,
     %|PG::ConnectionBad: could not translate host name "some.sample.com" to address: Name or service not known|,
     %|PG::ConnectionBad: FATAL: the database system is starting up|,
@@ -65,7 +65,7 @@ describe ActiveRecord::ConnectionAdapters::MakaraAbstractAdapter::ErrorHandler d
     let(:config) { YAML.load_file(config_path)['test'] }
     let(:handler){ described_class.new }
     let(:proxy) { FakeAdapter.new(config) }
-    let(:connection){ proxy.master_pool.connections.first }
+    let(:connection){ proxy.primary_pool.connections.first }
     let(:msg1) { "ActiveRecord::StatementInvalid: Mysql2::Error: Unknown command1: SELECT `users`.* FROM `users` WHERE `users`.`id` = 53469 LIMIT 1" }
     let(:msg2) { "activeRecord::statementInvalid: mysql2::error: unknown command2: SELECT `users`.* FROM `users` WHERE `users`.`id` = 53469 LIMIT 1" }
     let(:msg3) { "ActiveRecord::StatementInvalid: Mysql2::Error: Unknown command3: SELECT `users`.* FROM `users` WHERE `users`.`id` = 53469 LIMIT 1" }

@@ -11,18 +11,18 @@ All notable changes to this project will be documented in this file.
 [Full Changelog](https://github.com/taskrabbit/makara/compare/v0.3.10...v0.4.0)
 
 This release is a major change to how we remember state between requests. A redis store is no longer needed. Everything is in the cookies.
- - Implement stickiness for the duration of `master_ttl` via cookies [#194](https://github.com/taskrabbit/makara/pull/194) Rosa Gutierrez
+ - Implement stickiness for the duration of `primary_ttl` via cookies [#194](https://github.com/taskrabbit/makara/pull/194) Rosa Gutierrez
 
 
 ## v0.3.10 - 2018-03-20
 [Full Changelog](https://github.com/taskrabbit/makara/compare/v0.3.9...v0.3.10)
 
 Fixed
-- Send nextval queries to master and show queries to replicas for Postgres [#173](https://github.com/taskrabbit/makara/pull/173) Andrew Kane
+- Send nextval queries to primary and show queries to replicas for Postgres [#173](https://github.com/taskrabbit/makara/pull/173) Andrew Kane
 - Fixes can't add a new key into hash during iteration error [#174](https://github.com/taskrabbit/makara/pull/174) Andrew Kane
-- Fix: an application freezes when a slave is down [#180](https://github.com/taskrabbit/makara/pull/180) Alexey P
+- Fix: an application freezes when a replica is down [#180](https://github.com/taskrabbit/makara/pull/180) Alexey P
 - Allow SELECTs that use common table expressions to go to replicas [#184](https://github.com/taskrabbit/makara/pull/184) Andrew Kane
-- Send advisory lock requests to the master [#198](https://github.com/taskrabbit/makara/pull/198) George Claghorn
+- Send advisory lock requests to the primary [#198](https://github.com/taskrabbit/makara/pull/198) George Claghorn
 - Postgres exists query [#199](https://github.com/taskrabbit/makara/pull/199) Brian Leonard
 
 Documentation and Test
@@ -95,7 +95,7 @@ Changed
 
 Changed
 
-- A context is local to the curent thread of execution. This will allow you to stick to master safely in a single thread in systems such as sidekiq, for instance. Fix [#83](https://github.com/taskrabbit/makara/issues/83). [#84](https://github.com/taskrabbit/makara/pull/84) Matt Camuto
+- A context is local to the curent thread of execution. This will allow you to stick to primary safely in a single thread in systems such as sidekiq, for instance. Fix [#83](https://github.com/taskrabbit/makara/issues/83). [#84](https://github.com/taskrabbit/makara/pull/84) Matt Camuto
 
 ## v0.3.2 - 2015-05-16
 
@@ -129,7 +129,7 @@ Changed
 
 Fixed
 
-- Fix an issue for postgres that would route all queries to master. [#72](https://github.com/taskrabbit/makara/pull/72) Kali Donovan
+- Fix an issue for postgres that would route all queries to primary. [#72](https://github.com/taskrabbit/makara/pull/72) Kali Donovan
 - Fix an edge case which would cause SET operations to send to all connections([#70](https://github.com/taskrabbit/makara/issues/70)). [#80](https://github.com/taskrabbit/makara/pull/80) Michael Amor Righi
 - Fix performance regression with certain verions of [newrelic/rpm](https://github.com/newrelic/rpm)([#59](https://github.com/taskrabbit/makara/issues/59)). [#75](https://github.com/taskrabbit/makara/pull/75) Mike Nelson
 

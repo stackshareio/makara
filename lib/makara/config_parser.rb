@@ -9,19 +9,19 @@ require 'active_support/core_ext/hash/except'
 #   top_level: 'variable'
 #   another: 'top level variable'
 #   makara:
-#     master_ttl: 3
+#     primary_ttl: 3
 #     blacklist_duration: 20
 #     connections:
-#       - role: 'master'
-#       - role: 'slave'
-#       - role: 'slave'
-#         name: 'slave2'
+#       - role: 'primary'
+#       - role: 'replica'
+#       - role: 'replica'
+#         name: 'replica2'
 
 module Makara
   class ConfigParser
 
     DEFAULTS = {
-      :master_ttl => 5,
+      :primary_ttl => 5,
       :blacklist_duration => 30,
       :sticky => true
     }
@@ -156,16 +156,16 @@ module Makara
     end
 
 
-    def master_configs
+    def primary_configs
       all_configs
-        .select { |config| config[:role] == 'master' }
+        .select { |config| config[:role] == 'primary' }
         .map { |config| config.except(:role) }
     end
 
 
-    def slave_configs
+    def replica_configs
       all_configs
-        .reject { |config| config[:role] == 'master' }
+        .reject { |config| config[:role] == 'primary' }
         .map { |config| config.except(:role) }
     end
 

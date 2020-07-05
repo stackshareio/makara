@@ -54,6 +54,7 @@ module Makara
       @hijacked       = false
       @error_handler  ||= ::Makara::ErrorHandler.new
       @skip_sticking  = false
+      @force_primary  = false
       instantiate_connections
       super(config)
     end
@@ -74,6 +75,19 @@ module Makara
     def stick_to_primary!(persist = true)
       stickiness_duration = persist ? @ttl : 0
       Makara::Context.stick(@id, stickiness_duration)
+    end
+
+    # `stick_to_primary!` requires that `sticky` be true in the config, or `Makara::Context.stick` does nothing.
+    # Even then, it sticks for the entire request afterward, or the length of the primary_ttl.
+    #
+    # This method allows primary to be used for the given block only, then goes back to the original connection and sticky setup.
+    # This works to force the primary even if `sticky:false` is set in your config. This stops the need to use database transactions
+    # for a "read what you wrote" guarantee when not using `sticky:true`, Makara::Middleware, or not running in a web request.
+    def on_primary
+      @force_primary = true
+      yield if block_given?
+    ensure
+      @force_primary = false
     end
 
     def strategy_for(role)
@@ -195,8 +209,10 @@ module Makara
     end
 
     def _appropriate_pool(method_name, args)
-      # the args provided absolutely need primary
-      if needs_primary?(method_name, args)
+      if @force_primary
+        @primary_pool
+      elsif needs_primary?(method_name, args)
+        # the args provided absolutely need primarys
         stick_to_primary(method_name, args)
         @primary_pool
 

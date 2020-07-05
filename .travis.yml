@@ -16,10 +16,6 @@ before_script:
   - psql -c 'create extension postgis;' -U postgres
 
 rvm:
-  - 2.0
-  - 2.1
-  - 2.2
-  - 2.3
   - 2.4
   - 2.5.0
   - ruby-head
@@ -43,10 +39,6 @@ env:
 matrix:
   exclude:
     - gemfile: gemfiles/ar30.gemfile
-      rvm: 2.2
-    - gemfile: gemfiles/ar30.gemfile
-      rvm: 2.3
-    - gemfile: gemfiles/ar30.gemfile
       rvm: 2.4
     - gemfile: gemfiles/ar31.gemfile
       rvm: 2.4
@@ -76,26 +68,6 @@ matrix:
       rvm: ruby-head
     - gemfile: gemfiles/ar41.gemfile
       rvm: ruby-head
-    - gemfile: gemfiles/ar50.gemfile
-      rvm: 2.0
-    - gemfile: gemfiles/ar50.gemfile
-      rvm: 2.1
-    - gemfile: gemfiles/ar50.gemfile
-      rvm: 2.2
-    - gemfile: gemfiles/ar51.gemfile
-      rvm: 2.0
-    - gemfile: gemfiles/ar51.gemfile
-      rvm: 2.1
-    - gemfile: gemfiles/ar51.gemfile
-      rvm: 2.2
-    - gemfile: gemfiles/ar-head.gemfile
-      rvm: 2.0
-    - gemfile: gemfiles/ar-head.gemfile
-      rvm: 2.1
-    - gemfile: gemfiles/ar-head.gemfile
-      rvm: 2.2
-    - gemfile: gemfiles/ar-head.gemfile
-      rvm: 2.3
     - gemfile: gemfiles/ar-head.gemfile
       rvm: 2.4
   allow_failures:

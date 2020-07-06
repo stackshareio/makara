@@ -77,20 +77,24 @@ describe Makara::Proxy do
 
     it 'allows a block to use primary regardless of stickiness' do
       expect(proxy.sticky).to eq(true)
+      expect(proxy.primary_for?('select * from users')).to eq(false)
       proxy.on_primary do
         expect(proxy.primary_for?('select * from users')).to eq(true)
       end
       expect(proxy.sticky).to eq(true)
+      expect(proxy.primary_for?('select * from users')).to eq(false)
 
       config = config(1, 2).dup
       config[:makara][:sticky] = false
       proxy = klass.new(config)
 
       expect(proxy.sticky).to eq(false)
+      expect(proxy.primary_for?('select * from users')).to eq(false)
       proxy.on_primary do
         expect(proxy.primary_for?('select * from users')).to eq(true)
       end
       expect(proxy.sticky).to eq(false)
+      expect(proxy.primary_for?('select * from users')).to eq(false)
     end
 
     it 'supports a float primary_ttl for stickiness duration' do

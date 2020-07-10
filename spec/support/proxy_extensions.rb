@@ -1,9 +1,9 @@
 module ProxyExtensions
 
-  attr_reader :master_pool, :slave_pool, :id
-  
-  def master_for?(sql)
-    pool_for(sql) == master_pool
+  attr_reader :primary_pool, :replica_pool, :id
+
+  def primary_for?(sql)
+    pool_for(sql) == primary_pool
   end
 
   def would_stick?(sql)

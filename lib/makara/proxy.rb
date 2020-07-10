@@ -3,7 +3,7 @@ require 'active_support/core_ext/class/attribute'
 require 'active_support/core_ext/hash/keys'
 require 'active_support/core_ext/string/inflections'
 
-# The entry point of Makara. It contains a master and slave pool which are chosen based on the invocation
+# The entry point of Makara. It contains a primary and replica pool which are chosen based on the invocation
 # being proxied. Makara::Proxy implementations should declare which methods they are hijacking via the
 # `hijack_method` class method.
 # While debugging this class use prepend debug calls with Kernel. (Kernel.byebug for example)
@@ -49,11 +49,12 @@ module Makara
       @config         = config.symbolize_keys
       @config_parser  = Makara::ConfigParser.new(@config)
       @id             = @config_parser.id
-      @ttl            = @config_parser.makara_config[:master_ttl]
+      @ttl            = @config_parser.makara_config[:primary_ttl]
       @sticky         = @config_parser.makara_config[:sticky]
       @hijacked       = false
       @error_handler  ||= ::Makara::ErrorHandler.new
       @skip_sticking  = false
+      @force_primary  = false
       instantiate_connections
       super(config)
     end
@@ -69,11 +70,24 @@ module Makara
       @hijacked
     end
 
-    # If persist is true, we stick the proxy to master for subsequent requests
-    # up to master_ttl duration. Otherwise we just stick it for the current request
-    def stick_to_master!(persist = true)
+    # If persist is true, we stick the proxy to primary for subsequent requests
+    # up to primary_ttl duration. Otherwise we just stick it for the current request
+    def stick_to_primary!(persist = true)
       stickiness_duration = persist ? @ttl : 0
       Makara::Context.stick(@id, stickiness_duration)
+    end
+
+    # `stick_to_primary!` requires that `sticky` be true in the config, or `Makara::Context.stick` does nothing.
+    # Even then, it sticks for the entire request afterward, or the length of the primary_ttl.
+    #
+    # This method allows primary to be used for the given block only, then goes back to the original connection and sticky setup.
+    # This works to force the primary even if `sticky:false` is set in your config. This stops the need to use database transactions
+    # for a "read what you wrote" guarantee when not using `sticky:true`, Makara::Middleware, or not running in a web request.
+    def on_primary
+      @force_primary = true
+      yield if block_given?
+    ensure
+      @force_primary = false
     end
 
     def strategy_for(role)
@@ -140,25 +154,25 @@ module Makara
 
 
     def send_to_all(method_name, *args)
-      # slave pool must run first to allow for slave-->master failover without running operations on master twice.
+      # replica pool must run first to allow for replica-->primary failover without running operations on primary twice.
       handling_an_all_execution(method_name) do
-        @slave_pool.send_to_all method_name, *args
-        @master_pool.send_to_all method_name, *args
+        @replica_pool.send_to_all method_name, *args
+        @primary_pool.send_to_all method_name, *args
       end
     end
 
     def any_connection
-      @master_pool.provide do |con|
+      @primary_pool.provide do |con|
         yield con
       end
     rescue ::Makara::Errors::AllConnectionsBlacklisted, ::Makara::Errors::NoConnectionsAvailable
       begin
-        @master_pool.disabled = true
-        @slave_pool.provide do |con|
+        @primary_pool.disabled = true
+        @replica_pool.provide do |con|
           yield con
         end
       ensure
-        @master_pool.disabled = false
+        @primary_pool.disabled = false
       end
     end
 
@@ -176,7 +190,7 @@ module Makara
     end
 
 
-    # master or slave
+    # primary or replica
     def appropriate_pool(method_name, args)
 
       # for testing purposes
@@ -184,45 +198,47 @@ module Makara
       yield pool
 
     rescue ::Makara::Errors::AllConnectionsBlacklisted, ::Makara::Errors::NoConnectionsAvailable => e
-      if pool == @master_pool
-        @master_pool.connections.each(&:_makara_whitelist!)
-        @slave_pool.connections.each(&:_makara_whitelist!)
+      if pool == @primary_pool
+        @primary_pool.connections.each(&:_makara_whitelist!)
+        @replica_pool.connections.each(&:_makara_whitelist!)
         Kernel.raise e
       else
-        @master_pool.blacklist_errors << e
+        @primary_pool.blacklist_errors << e
         retry
       end
     end
 
     def _appropriate_pool(method_name, args)
-      # the args provided absolutely need master
-      if needs_master?(method_name, args)
-        stick_to_master(method_name, args)
-        @master_pool
+      if @force_primary
+        @primary_pool
+      elsif needs_primary?(method_name, args)
+        # the args provided absolutely need primarys
+        stick_to_primary(method_name, args)
+        @primary_pool
 
-      elsif stuck_to_master?
+      elsif stuck_to_primary?
 
-        # we're on master because we already stuck this proxy in this
+        # we're on primary because we already stuck this proxy in this
         # request or because we got stuck in previous requests and the
         # stickiness is still valid
-        @master_pool
+        @primary_pool
 
-      # all slaves are down (or empty)
-      elsif @slave_pool.completely_blacklisted?
-        stick_to_master(method_name, args)
-        @master_pool
+      # all replicas are down (or empty)
+      elsif @replica_pool.completely_blacklisted?
+        stick_to_primary(method_name, args)
+        @primary_pool
 
       elsif in_transaction?
-        @master_pool
+        @primary_pool
 
-      # yay! use a slave
+      # yay! use a replica
       else
-        @slave_pool
+        @replica_pool
       end
     end
 
-    # do these args require a master connection
-    def needs_master?(method_name, args)
+    # do these args require a primary connection
+    def needs_primary?(method_name, args)
       true
     end
 
@@ -242,16 +258,16 @@ module Makara
     end
 
 
-    def stuck_to_master?
+    def stuck_to_primary?
       sticky? && Makara::Context.stuck?(@id)
     end
 
-    def stick_to_master(method_name, args)
+    def stick_to_primary(method_name, args)
       # check to see if we're configured, bypassed, or some custom implementation has input
       return unless should_stick?(method_name, args)
 
       # do the sticking
-      stick_to_master!
+      stick_to_primary!
     end
 
     # For the generic proxy implementation, we stick if we are sticky,
@@ -265,19 +281,19 @@ module Makara
       @sticky && !@skip_sticking
     end
 
-    # use the config parser to generate a master and slave pool
+    # use the config parser to generate a primary and replica pool
     def instantiate_connections
-      @master_pool = Makara::Pool.new('master', self)
-      @config_parser.master_configs.each do |master_config|
-        @master_pool.add master_config do
-          graceful_connection_for(master_config)
+      @primary_pool = Makara::Pool.new('primary', self)
+      @config_parser.primary_configs.each do |primary_config|
+        @primary_pool.add primary_config do
+          graceful_connection_for(primary_config)
         end
       end
 
-      @slave_pool = Makara::Pool.new('slave', self)
-      @config_parser.slave_configs.each do |slave_config|
-        @slave_pool.add slave_config do
-          graceful_connection_for(slave_config)
+      @replica_pool = Makara::Pool.new('replica', self)
+      @config_parser.replica_configs.each do |replica_config|
+        @replica_pool.add replica_config do
+          graceful_connection_for(replica_config)
         end
       end
     end
@@ -285,13 +301,13 @@ module Makara
     def handling_an_all_execution(method_name)
       yield
     rescue ::Makara::Errors::NoConnectionsAvailable => e
-      if e.role == 'master'
-        Kernel.raise ::Makara::Errors::NoConnectionsAvailable.new('master and slave')
+      if e.role == 'primary'
+        Kernel.raise ::Makara::Errors::NoConnectionsAvailable.new('primary and replica')
       end
-      @slave_pool.disabled = true
+      @replica_pool.disabled = true
       yield
     ensure
-      @slave_pool.disabled = false
+      @replica_pool.disabled = false
     end
 
 

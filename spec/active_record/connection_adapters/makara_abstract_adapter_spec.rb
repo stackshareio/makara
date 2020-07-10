@@ -37,11 +37,11 @@ describe ActiveRecord::ConnectionAdapters::MakaraAbstractAdapter do
     'select release_lock(\'foo\')' => true,
     'select pg_advisory_lock(12345)' => true,
     'select pg_advisory_unlock(12345)' => true
-  }.each do |sql, should_go_to_master|
+  }.each do |sql, should_go_to_primary|
 
-    it "determines that \"#{sql}\" #{should_go_to_master ? 'requires' : 'does not require'} master" do
+    it "determines that \"#{sql}\" #{should_go_to_primary ? 'requires' : 'does not require'} primary" do
       proxy = klass.new(config(1,1))
-      expect(proxy.master_for?(sql)).to eq(should_go_to_master)
+      expect(proxy.primary_for?(sql)).to eq(should_go_to_primary)
     end
 
   end
@@ -64,8 +64,8 @@ describe ActiveRecord::ConnectionAdapters::MakaraAbstractAdapter do
 
     it "determines that \"#{sql}\" #{should_send_to_all_connections ? 'should' : 'should not'} be sent to all underlying connections" do
       proxy = klass.new(config(1,1))
-      proxy.master_pool.connections.each{|con| expect(con).to receive(:execute).with(sql).once}
-      proxy.slave_pool.connections.each do |con|
+      proxy.primary_pool.connections.each{|con| expect(con).to receive(:execute).with(sql).once}
+      proxy.replica_pool.connections.each do |con|
         if should_send_to_all_connections
           expect(con).to receive(:execute).with(sql).once
         else
@@ -109,7 +109,7 @@ describe ActiveRecord::ConnectionAdapters::MakaraAbstractAdapter do
     } => true
   }.each do |sql,should_stick|
 
-    it "should #{should_stick ? 'stick' : 'not stick'} to master if handling sql like \"#{sql}\"" do
+    it "should #{should_stick ? 'stick' : 'not stick'} to primary if handling sql like \"#{sql}\"" do
       proxy = klass.new(config(0,0))
       expect(proxy.would_stick?(sql)).to eq(should_stick)
     end

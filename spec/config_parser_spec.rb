@@ -8,14 +8,14 @@ describe Makara::ConfigParser do
       :makara => {
         :connections => [
           {
-            :role => 'master',
-            :name => 'themaster'
+            :role => 'primary',
+            :name => 'theprimary'
           },
           {
-            :name => 'slave1'
+            :name => 'replica1'
           },
           {
-            :name => 'slave2'
+            :name => 'replica2'
           }
         ]
       }
@@ -25,7 +25,7 @@ describe Makara::ConfigParser do
   context '::merge_and_resolve_default_url_config' do
     let(:config_without_url) do
       {
-        :master_ttl => 5,
+        :primary_ttl => 5,
         :blacklist_duration => 30,
         :sticky => true,
         :adapter => 'mysql2_makara',
@@ -40,7 +40,7 @@ describe Makara::ConfigParser do
 
     let(:config_with_url) do
       {
-        :master_ttl => 5,
+        :primary_ttl => 5,
         :blacklist_duration => 30,
         :sticky => true,
         :adapter => 'mysql2_makara',
@@ -108,32 +108,32 @@ describe Makara::ConfigParser do
     expect(parser.id).to eq('myproxyidwithreservedcharacters')
   end
 
-  context 'master and slave configs' do
-    it 'should provide master and slave configs' do
+  context 'primary and replica configs' do
+    it 'should provide primary and replica configs' do
       parser = described_class.new(config)
-      expect(parser.master_configs).to eq([
+      expect(parser.primary_configs).to eq([
         {
-          :name => 'themaster',
+          :name => 'theprimary',
           :top_level => 'value',
           :sticky => true,
           :blacklist_duration => 30,
-          :master_ttl => 5
+          :primary_ttl => 5
         }
       ])
-      expect(parser.slave_configs).to eq([
+      expect(parser.replica_configs).to eq([
         {
-          :name => 'slave1',
+          :name => 'replica1',
           :top_level => 'value',
           :sticky => true,
           :blacklist_duration => 30,
-          :master_ttl => 5
+          :primary_ttl => 5
         },
         {
-          :name => 'slave2',
+          :name => 'replica2',
           :top_level => 'value',
           :sticky => true,
           :blacklist_duration => 30,
-          :master_ttl => 5
+          :primary_ttl => 5
         }
       ])
     end
@@ -141,32 +141,32 @@ describe Makara::ConfigParser do
     it 'connection configuration should override makara config' do
       config[:makara][:blacklist_duration] = 123
       config[:makara][:connections][0][:blacklist_duration] = 456
-      config[:makara][:connections][1][:top_level] = 'slave value'
+      config[:makara][:connections][1][:top_level] = 'replica value'
 
       parser = described_class.new(config)
-      expect(parser.master_configs).to eq([
+      expect(parser.primary_configs).to eq([
         {
-          :name => 'themaster',
+          :name => 'theprimary',
           :top_level => 'value',
           :sticky => true,
           :blacklist_duration => 456,
-          :master_ttl => 5
+          :primary_ttl => 5
         }
       ])
-      expect(parser.slave_configs).to eq([
+      expect(parser.replica_configs).to eq([
         {
-          :name => 'slave1',
-          :top_level => 'slave value',
+          :name => 'replica1',
+          :top_level => 'replica value',
           :sticky => true,
           :blacklist_duration => 123,
-          :master_ttl => 5
+          :primary_ttl => 5
         },
         {
-          :name => 'slave2',
+          :name => 'replica2',
           :top_level => 'value',
           :sticky => true,
           :blacklist_duration => 123,
-          :master_ttl => 5
+          :primary_ttl => 5
         }
       ])
     end
